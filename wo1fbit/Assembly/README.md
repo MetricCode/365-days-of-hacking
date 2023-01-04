@@ -55,7 +55,7 @@ add $4, %eax
 
 ### Multiplication
 The `imul` opcode is used for multiplication. The second operand holds the results.
-To mulitply the values inside the rdi and rsi registers:
+To mulitply the values inside the rdi and rsi registers and save results in %rsi:
 
 ~~~
 imul %rdi, $rsi
