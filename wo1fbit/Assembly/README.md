@@ -41,3 +41,38 @@ movl $4, %eax
 Note: `in AT&T when loading data in memory the source comes first followed by the destination e.g opcode src, dest .The "%" symbol is prefixed for each register reference and a "$" for immediate operands.`
 
 The opcode is the instruction that is executed by the CPU and the operand is the data or memory location used to execute that instruction. For the case above, `movl` is the opcode while the rest are the operands.
+
+
+## Arithmetic
+### Addition
+
+The `add` opcode is used to perform addition operations. The results are stored in the second operand.
+To add the number 4 to the eax register:
+
+~~~
+add $4, %eax
+~~~
+
+### Multiplication
+The `imul` opcode is used for multiplication. The second operand holds the results.
+To mulitply the values inside the rdi and rsi registers:
+
+~~~
+imul %rdi, $rsi
+~~~
+
+### Division
+The `div` opcode is used for division. However x86 division is different from normal math in such that it is integer division. Normally 10/3 = 10.3 but in integer division 10/3 = 3. Why? In integer division, 3.33 gets rounded to 3.
+
+For this operation, the `rax` register is loaded by the divided (for those who like maths: in 10/3, 10 is the divided while 3 is the divisor). then the opcode is called with the divisor as it's only operand. The result is placed in the rdx register.
+
+For example, speed = distance / time. To calculate the speed in assembly, you will first load distance in the rax register, load time in another register, say rdi. The rsult code would be:
+
+For this our distance is 40 metres and time is 8 seconds
+
+```
+mov $40, %rax ; load dist into rax
+mov $8, %rdi ; load time into rdi
+div %rdi ; divide whatever is in rax with rdi, the remainder store in rdx
+
+```
