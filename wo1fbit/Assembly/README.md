@@ -81,3 +81,10 @@ Syntax:
 push $4; push the value 4 on top of the stack
 pop %eax; remove the data on top of the stack which is 4 and place it in the eax register
 ~~~
+
+## Jumps
+* `jmp location` - jump (unconditional)
+* `je` - jump if equal
+* `jne location` - jump if not equal
+* `jns location` - Jump if not signed (Jump if positive). Jumps to the destination label mentioned in the instruction if the SF is set, else no action is taken. If the sign flag is 0 it indicates a positive signed number. Hence the instruction causes a jump if the result of previous instruction is positive.
+* `jg location` - jump if greater. It performs a signed comparison jump after a `cmp` if the destination operand is greater than the source operand
