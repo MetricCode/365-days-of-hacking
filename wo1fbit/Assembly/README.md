@@ -1,38 +1,45 @@
 # Assembly
-There are many "flavours" of Assembly and since I'm an "original" type of guy, I prefer writing my Assembly in AT&T syntax.
+There are many flavours of Assembly and since I'm an original type of guy, all assembly code here is in AT&T syntax.
 
 ## Sections
 Every assembly program is divided into 3 distinct sections, with each having it's own purpose. These sections are:
 
 * data section
 * text section
-* Bss section
+* bss section
 
-1. Data section - this section is used to hold data that doesn't change in value when the program is run. They stay the same on program start and finish. They are what you might refer to as constants.
+1. data section - holds data that doesn't change when the program is run. The data remains the same on program start to finish.
 
-2. Bss section - this section is used to hold unitialized data. The data might/not change when program is run. They are what we refer to as variables.
+2. bss section - holds unitialized data. We can define them as variables.
 
-3. Text section - the magic happens here. All the code thaat is going to be executed by the program is stored here.
+3. text section - the magic happens here. All the code thaat is going to be executed by the program is stored here. In most languages, like C, the assemler or compiler needs to know where the program starts. In C, the main() function marks this place. In most assembly languages, the `_start` label `(a label is a symbolic name that is associated with a specific location in the program's code or data, they are typically defined by placing a label followed by a colon (:) on a line by itself)` is a special label that marks the beginning of the program. It is typically the entry point for the program, and the processor starts executing instructions at this point when the program is run. In some cases it is not mandatory while in some it is. For example, in the GNU Assembler (GAS) syntax used by many Unix-like systems, the _start label is optional and the entry point can be specified using the `.globl` directive and the `main` symbol.
 
-You may omit the data and bss section if they are not needed at all the program.
-You declare a section by using `.section`:
-
+A section is declared by using `.section section_name`.
 ~~~
-.section .data - declaring the data section
-.section .text - declaring the text section
-.section .bss - declaring the bss section
+.section .data - declare the data section
+.section .text - declare the text section
+.section .bss - declare the bss section
+~~~
 
+To summarize, a basic template for an assembly program in AT&T syntax looks like this:
+~~~
+.section .data ; remember this is optional depending on what you're doing
+.section .text
+.globl _start ; define the _start label marking where the program starts
+_start:        ; lables are declared by giving the name of the label followed by a colon
+[instructions]
+.section .bss ; this is optionsal depending on what you're doing
 ~~~
 
 ## Data Movement
 When we want to move data from one register to another or from memory to memory or register to memory and vise versa, we use the `mov` opcode.
 
-Syntax
+Syntax:
 ~~~
 mov src, dest
 ~~~
 
-Note: `in AT&T when loading data in memory the source comes first followed by the destination e.g opcode src, dest .The "%" symbol is prefixed for each register reference and a "$" for immediate operands.`
+Note: `in AT&T when loading data in memory the source comes first followed by the destination e.g "opcode src, dest" .The "%" symbol is prefixed for each register reference and a "$" for immediate operands.`
 
 The opcode is the instruction that is executed by the CPU and the operand is the data or memory location used to execute that instruction. For the case above, `mov` is the opcode while the rest are the operands.
 
