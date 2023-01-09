@@ -1,18 +1,20 @@
 # Assembly
-There are many flavours of Assembly and since I'm an original type of guy, all assembly code here is in AT&T syntax.
+There are many flavors of assembly language, each with its own unique syntax and features. Personally, I prefer to write my assembly code using AT&T syntax.
+
+Every assembly program is divided into three distinct sections, each with a specific purpose:
 
 ## Sections
 Every assembly program is divided into 3 distinct sections, with each having it's own purpose. These sections are:
 
-* data section
-* text section
-* bss section
+* Data section
+* Text section
+* BSS (Block Started by Symbol) section
 
-1. data section - holds data that doesn't change when the program is run. The data remains the same on program start to finish.
+1. Data section - Data section - this section is used to hold data that doesn't change in value when the program is run. They remain the same from program start to finish. They can be thought of as constants.
 
-2. bss section - holds unitialized data. We can define them as variables.
+2. BSS section - this section is used to hold uninitialized data. The data may or may not change when the program is run. They are what we refer to as variables.
 
-3. text section - the magic happens here. All the code thaat is going to be executed by the program is stored here. In most languages, like C, the assemler or compiler needs to know where the program starts. In C, the main() function marks this place. In most assembly languages, the `_start` label `(a label is a symbolic name that is associated with a specific location in the program's code or data, they are typically defined by placing a label followed by a colon (:) on a line by itself)` is a special label that marks the beginning of the program. It is typically the entry point for the program, and the processor starts executing instructions at this point when the program is run. In some cases it is not mandatory while in some it is. For example, in the GNU Assembler (GAS) syntax used by many Unix-like systems, the _start label is optional and the entry point can be specified using the `.globl` directive and the `main` symbol.
+3. Text section - the magic happens here. All the code that is going to be executed by the program is stored here.
 
 A section is declared by using `.section section_name`.
 ~~~
@@ -32,16 +34,19 @@ _start:        ; lables are declared by giving the name of the label followed by
 ~~~
 
 ## Data Movement
-When we want to move data from one register to another or from memory to memory or register to memory and vise versa, we use the `mov` opcode.
 
-Syntax:
+To move data from one location to another (e.g. from a register to memory, from memory to a register, etc.), you can use the mov instruction. The syntax is as follows:
 ~~~
 mov src, dest
 ~~~
 
-Note: `in AT&T when loading data in memory the source comes first followed by the destination e.g "opcode src, dest" .The "%" symbol is prefixed for each register reference and a "$" for immediate operands.`
+Note that in AT&T syntax, the source comes before the destination (e.g. mov src, dest). The % symbol is used to refer to registers, and the $ symbol is used for immediate operands.
 
-The opcode is the instruction that is executed by the CPU and the operand is the data or memory location used to execute that instruction. For the case above, `mov` is the opcode while the rest are the operands.
+The opcode (e.g. mov) is the instruction that is executed by the CPU, and the operands (e.g. src and dest) are the data or memory locations used in the instruction.
+
+### Operand Sizes
+
+In x86 assembly, you can specify the size of an operand using suffixes on the opcodes and operands. For example, the mov opcode has different variants for moving different sizes of data: movb for moving a byte (8 bits), movw for moving a word (16 bits), and movl for moving a long (32 bits). If you don't specify a size, the assembler will use the default size for the current mode (16 bits for real mode, 32 bits for protected mode).
 
 ## Registers
 Registers are used to hold data for our programs, with different registers having specific functions.
@@ -95,3 +100,55 @@ pop %eax; remove the data on top of the stack which is 4 and place it in the eax
 * `jne location` - jump if not equal
 * `jns location` - Jump if not signed (Jump if positive). Jumps to the destination label mentioned in the instruction if the SF is set, else no action is taken. If the sign flag is 0 it indicates a positive signed number. Hence the instruction causes a jump if the result of previous instruction is positive.
 * `jg location` - jump if greater. It performs a signed comparison jump after a `cmp` if the destination operand is greater than the source operand
+
+## hello World !
+~~~
+; this part of the program is explained below
+
+.section .data
+message:
+.asciz "Hello World!\n"
+message_len:
+.equ len, message_len-message
+.section .text
+.globl _start
+_start:
+
+movl $message, %ecx
+movl $len, %edx
+movl $1, %ebx
+movl $4, %eax
+int $0x80
+
+; this part of the code is where  we exit. When a program exits gracefully, the status code is 0, anything else means there was
+; problem unless stated otherwise. The ebx register holds the exit status code of the program. Since we want to exit, we put the system
+; exit call 1 in the eax register then we call the kernel with the int instruction.
+
+movl $0, %ebx
+movl $1, %eax
+int $0x80
+~~~
+
+When assembled and ran, the above program prints "Hello World!" to the terminal.
+
+The hello world program is explained as follows.
+
+1. The `ecx` register holds the data or location of the data to be printed.
+2. The `edx` register holds the length of the data to be printed.
+3. The `ebx` register holds the file descriptors of where to read or write the data. In our case, we use 2 as our fd since we are writing to stdout. In linux the default file descriptors are 0,1 and 2 with each fd referencing stdin, stdout and stderr respectively.
+4. The `eax` register holds the system call. System calls are used by the program to ask the kernel for assistance with different system calls telling the kernel what is needed. Since we are writing, we use `4` as the system call number for write.
+
+* `.section .data` - data section.
+* `message:` - label that marks a place in memory where our message is.
+* `.ascii "Hello World\n"` - the message. The .asciz directive accepts string literals as arguments. String literal are a sequence characters in double quotes. The string literals are assembled into consecutive memory locations. The assembler automatically inserts a nul character (\0 character) after each string. The .ascii directive is same as .asciz, but the assembler does not insert a null character after each string.
+* `message_len:` - label that we use to get the length of our message.
+* `.equ len, message_len-message` - `.equ` is a directive that tells the assembler that when it sees `len` anywhere it should replace it with the value of `message_len-message`. This makes it easy for us as the assembler calculates the len for us. This is because we would need to give `edx` the correct length of our message otherwise we would a get a shortened message.
+
+To assemble the above program, we run:
+the name of the file is learn.s
+
+```
+as -o learn.o learn.s ## create the object file
+ld -o learn learn.o ## link the object file with the needed files ad save the binary as learn
+```
+Running the above commands every time we make changes to learn.s is tiring, to automate all steps of building the binary , we make use of Makefiles.
